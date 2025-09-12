@@ -46,7 +46,6 @@ app.use('/api/auth', require('./routes/auth.routes'));
 app.use('/api/ministerios', require('./routes/ministerio.routes'));
 app.use('/api/lider', require('./routes/lider.routes'));
 app.use('/api/chatbot', require('./routes/chatbot.routes'));
-// --- LINHA ADICIONADA ---
 app.use('/api/escalas', require('./routes/escala.routes'));
 app.use('/api/disponibilidade', require('./routes/disponibilidade.routes'));
 
@@ -58,5 +57,32 @@ app.get('/', (req, res) => {
 // Define a porta a partir do arquivo .env ou usa 5000 como padrão
 const PORT = process.env.PORT || 5000;
 
+// --- INÍCIO DO CÓDIGO DE AUTO-PING ---
+
+// URL da sua aplicação que será "pingada"
+const PING_URL = "https://back-end-volunt-rios.onrender.com";
+// Intervalo em minutos. 14 minutos é um valor seguro para evitar o "sleep"
+const PING_INTERVAL_MINUTES = 10;
+
+const selfPing = () => {
+  fetch(PING_URL)
+    .then(res => {
+      // É importante consumir a resposta para fechar a conexão
+      res.text().then(body => {
+        console.log(`[Auto-Ping] Ping bem-sucedido em ${new Date().toLocaleString('pt-BR')}. Status: ${res.status}.`);
+      });
+    })
+    .catch(err => {
+      console.error(`[Auto-Ping] Erro: ${err.message} em ${new Date().toLocaleString('pt-BR')}`);
+    });
+};
+
+// --- FIM DO CÓDIGO DE AUTO-PING ---
+
 // Inicia o servidor
-app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Servidor rodando na porta ${PORT}`);
+  
+  // Inicia o intervalo de pings DEPOIS que o servidor já está no ar
+  setInterval(selfPing, PING_INTERVAL_MINUTES * 60 * 1000); // Converte minutos para milissegundos
+});
