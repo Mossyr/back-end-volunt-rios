@@ -1,6 +1,5 @@
 // controllers/disponibilidade.controller.js
 const Disponibilidade = require('../models/disponibilidade.model');
-// LINHA ADICIONADA: Importa o modelo de Escala para consulta
 const Escala = require('../models/escala.model');
 
 /**
@@ -8,7 +7,7 @@ const Escala = require('../models/escala.model');
  * Se o usuário já estiver escalado para a data, retorna um status de conflito.
  */
 exports.toggleDisponibilidade = async (req, res) => {
-    const { data } = req.body; // data no formato 'YYYY-MM-DD'
+    const { data } = req.body; // data string no formato 'YYYY-MM-DD'
     const usuarioId = req.user.id;
 
     if (!data) {
@@ -19,28 +18,40 @@ exports.toggleDisponibilidade = async (req, res) => {
         const registroExistente = await Disponibilidade.findOne({ usuario: usuarioId, data: data });
 
         if (registroExistente) {
-            // Se já existe, o usuário está se tornando DISPONÍVEL, então apenas removemos.
             await Disponibilidade.findByIdAndDelete(registroExistente._id);
             res.json({ msg: 'Disponibilidade restaurada.', status: 'disponivel' });
         } else {
-            // Se não existe, o usuário quer se tornar INDISPONÍVEL.
-            // --- INÍCIO DA LÓGICA DE VERIFICAÇÃO DE CONFLITO ---
+            // --- INÍCIO DA LÓGICA DE VERIFICAÇÃO DE CONFLITO (AGORA CORRIGIDA) ---
             
-            // Primeiro, verificamos se o usuário já está em uma escala para este dia.
-            const escalaExistente = await Escala.findOne({ usuario: usuarioId, data: data });
+            // Cria um objeto Date para o início do dia (00:00:00)
+            const inicioDoDia = new Date(data);
+            inicioDoDia.setUTCHours(0, 0, 0, 0);
 
-            // Se uma escala for encontrada, retornamos o status de conflito.
+            // Cria um objeto Date para o fim do dia (23:59:59)
+            const fimDoDia = new Date(data);
+            fimDoDia.setUTCHours(23, 59, 59, 999);
+
+            // Busca por uma escala para o usuário que esteja DENTRO do intervalo do dia inteiro.
+            const escalaExistente = await Escala.findOne({
+                usuario: usuarioId,
+                data: {
+                    $gte: inicioDoDia, // $gte = Greater Than or Equal (Maior ou igual a)
+                    $lte: fimDoDia      // $lte = Less Than or Equal (Menor ou igual a)
+                }
+            });
+            
+            // --- FIM DA LÓGICA DE VERIFICAÇÃO ---
+
             if (escalaExistente) {
+                // Se encontrou, retorna o conflito como esperado.
                 return res.json({
                     msg: 'Usuário já está escalado para este dia. Não é possível marcar como indisponível.',
                     status: 'conflito_escala',
-                    escalaId: escalaExistente._id // Enviamos o ID da escala para o front-end
+                    escalaId: escalaExistente._id
                 });
             }
-            
-            // --- FIM DA LÓGICA DE VERIFICAÇÃO DE CONFLITO ---
 
-            // Se não houver conflito de escala, criamos o registro de indisponibilidade.
+            // Se não houver conflito, cria o registro de indisponibilidade.
             const novaIndisponibilidade = new Disponibilidade({
                 usuario: usuarioId,
                 data: data,
@@ -61,7 +72,6 @@ exports.toggleDisponibilidade = async (req, res) => {
 exports.getMinhasDisponibilidades = async (req, res) => {
     try {
         const indisponibilidades = await Disponibilidade.find({ usuario: req.user.id });
-        // Mapeia para retornar apenas o array de strings de data, como o front-end espera.
         const datasIndisponiveis = indisponibilidades.map(item => item.data);
         res.json(datasIndisponiveis);
     } catch (error) {
