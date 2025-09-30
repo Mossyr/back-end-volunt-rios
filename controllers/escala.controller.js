@@ -1,9 +1,13 @@
 const Turno = require('../models/escala.model');
 const Disponibilidade = require('../models/disponibilidade.model');
 const Usuario = require('../models/usuario.model');
+// ===================================================================
+// --- ALTERAÇÃO: Novos modelos importados ---
+const Troca = require('../models/troca.model');
+const Notification = require('../models/notification.model');
+// ===================================================================
 
-// ... (as outras funções do controller: createTurno, getTurnosPorMinisterio, etc. permanecem iguais) ...
-exports.createTurno = async (req, res) => { // ou exports.criarTurno
+exports.createTurno = async (req, res) => {
   const { ministerioId, data, turno, voluntarios } = req.body;
   
   try {
@@ -99,37 +103,29 @@ exports.getTurnoById = async (req, res) => {
     }
 };
 
-// --- NOVA FUNÇÃO ADICIONADA ---
-// @desc    Busca voluntários disponíveis para uma troca
-// @route   GET /api/escalas/:turnoId/voluntarios-para-troca
-// @access  Privado
 exports.getVoluntariosParaTroca = async (req, res) => {
     try {
-        // 1. Encontra a escala para a qual a troca está sendo solicitada
         const turno = await Turno.findById(req.params.turnoId);
         if (!turno) {
             return res.status(404).json({ msg: "Escala não encontrada." });
         }
-
-        // 2. Formata a data da escala para o formato 'YYYY-MM-DD'
         const dataDoTurno = new Date(turno.data).toISOString().split('T')[0];
-
-        // 3. Busca os IDs de todos os usuários que marcaram indisponibilidade na data do turno
         const indisponibilidades = await Disponibilidade.find({ data: dataDoTurno }).select('usuario');
         const idsIndisponiveis = indisponibilidades.map(i => i.usuario);
-
-        // 4. Monta a lista de IDs a serem excluídos da busca:
-        //    - O próprio usuário que está solicitando a troca (req.user.id)
-        //    - Todos os voluntários que já estão na escala
-        //    - Todos os voluntários que estão indisponíveis na data
         const idsExcluidos = [req.user.id, ...turno.voluntarios, ...idsIndisponiveis];
 
-        // 5. Busca todos os voluntários elegíveis no banco
+        // ===================================================================
+        // --- ALTERAÇÃO: Pequena melhoria na busca para garantir a consulta correta ---
         const voluntariosElegiveis = await Usuario.find({
-            '_id': { $nin: idsExcluidos }, // '$nin' significa "not in" (não está na lista)
-            'ministerios.ministerio': turno.ministerio, // Do mesmo ministério da escala
-            'ministerios.status': 'Aprovado' // Apenas voluntários aprovados
-        }).select('nome sobrenome'); // Retorna apenas o nome e sobrenome
+            '_id': { $nin: idsExcluidos },
+            'ministerios': {
+                $elemMatch: { // Garante que o status 'Aprovado' é para o ministério correto
+                    ministerio: turno.ministerio,
+                    status: 'Aprovado'
+                }
+            }
+        }).select('nome sobrenome');
+        // ===================================================================
 
         res.json(voluntariosElegiveis);
 
@@ -138,8 +134,46 @@ exports.getVoluntariosParaTroca = async (req, res) => {
         res.status(500).json({ msg: 'Erro no servidor ao processar a solicitação.' });
     }
 };
-// ----------------------------------------------------
 
+// ===================================================================
+// --- NOVA FUNÇÃO ADICIONADA ---
+// @desc    Cria a solicitação de troca e envia a notificação
+// @access  Privado
+exports.solicitarTroca = async (req, res) => {
+    const { turnoId, destinatarioId } = req.body;
+    const solicitanteId = req.user.id;
+
+    try {
+        const turno = await Turno.findById(turnoId);
+        if (!turno) {
+            return res.status(404).json({ msg: "Escala não encontrada." });
+        }
+        const dataFormatada = new Date(turno.data).toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+
+        const novaTroca = new Troca({
+            turno: turnoId,
+            solicitante: solicitanteId,
+            destinatario: destinatarioId
+        });
+        await novaTroca.save();
+
+        const solicitante = await Usuario.findById(solicitanteId).select('nome');
+        await Notification.create({
+            user: destinatarioId, // Para quem é a notificação
+            type: 'SWAP_REQUEST',
+            fromUser: solicitanteId,
+            message: `<strong>${solicitante.nome}</strong> quer trocar a escala do dia <strong>${dataFormatada}</strong> com você.`,
+            relatedId: novaTroca._id // Guarda o ID da troca para futuras ações (aceitar/recusar)
+        });
+
+        res.status(201).json({ msg: 'Solicitação de troca enviada com sucesso!' });
+
+    } catch (error) {
+        console.error("Erro ao solicitar troca:", error);
+        res.status(500).json({ msg: 'Erro no servidor ao processar a solicitação.' });
+    }
+};
+// ===================================================================
 
 exports.updateTurno = async (req, res) => {
     const { voluntarios } = req.body;
@@ -154,16 +188,12 @@ exports.updateTurno = async (req, res) => {
         if (!turno) {
             return res.status(404).json({ msg: "Escala não encontrada." });
         }
-
-        // Lógica de permissão: Apenas o criador pode editar
         if (turno.criado_por.toString() !== req.user.id) {
             return res.status(403).json({ msg: "Não autorizado. Apenas o líder que criou a escala pode editá-la." });
         }
         
         turno.voluntarios = voluntarios;
         await turno.save();
-
-        // Envia uma resposta JSON de sucesso
         res.json({ msg: 'Escala atualizada com sucesso!', turno });
 
     } catch (error) {
@@ -175,33 +205,24 @@ exports.updateTurno = async (req, res) => {
 exports.deleteTurno = async (req, res) => {
     try {
         const turno = await Turno.findById(req.params.turnoId);
-
         if (!turno) {
             return res.status(404).json({ msg: "Escala não encontrada." });
         }
-
-        // Nova lógica de permissão:
         const userId = req.user.id;
-        const ministerioId = turno.ministerio; // Pega o ID do ministério da própria escala
-
-        // Busca o usuário que está fazendo a requisição para checar suas permissões
+        const ministerioId = turno.ministerio;
         const usuario = await Usuario.findById(userId);
         
-        // Verifica se o usuário tem a função de 'Líder' para o ministério específico da escala
         const isLeaderOfMinistry = usuario.ministerios.some(
             m => m.ministerio.equals(ministerioId) && m.funcao === 'Líder' && m.status === 'Aprovado'
         );
 
-        // Se ele não for líder do ministério correto, nega o acesso
         if (!isLeaderOfMinistry) {
             return res.status(403).json({ msg: "Não autorizado. Você precisa ser um líder deste ministério para excluir a escala." });
         }
 
-        // Se a permissão foi concedida, exclui a escala
         await turno.deleteOne();
-
         res.json({ msg: "Escala excluída com sucesso." });
-
+        
     } catch (error) {
         console.error("Erro ao excluir turno:", error);
         res.status(500).json({ msg: "Erro no servidor." });

@@ -12,26 +12,28 @@ router.get('/me/todas', protect, escalaController.getMinhasEscalas);
 // --- ROTAS PARA UM TURNO ESPECÍFICO ---
 // Busca um turno pelo ID
 router.get('/turno/:turnoId', protect, escalaController.getTurnoById);
-
-// Exclui um turno (apenas o criador)
+// Exclui um turno
 router.delete('/turno/:turnoId', protect, escalaController.deleteTurno);
-
-// Atualiza um turno (apenas o criador)
+// Atualiza um turno
 router.put('/turno/:turnoId', protect, escalaController.updateTurno);
 
-
-// --- NOVA ROTA ADICIONADA ---
+// --- ROTAS PARA GERENCIAR TROCAS ---
 // @desc    Busca voluntários disponíveis para troca em uma escala específica
 // @route   GET /api/escalas/:turnoId/voluntarios-para-troca
-// @access  Privado (qualquer usuário logado)
+// @access  Privado
 router.get('/:turnoId/voluntarios-para-troca', protect, escalaController.getVoluntariosParaTroca);
-// ----------------------------
 
+// ===================================================================
+// --- NOVA ROTA ADICIONADA ---
+// @desc    Cria uma nova solicitação de troca de escala e notifica o destinatário
+// @route   POST /api/escalas/trocas/solicitar
+// @access  Privado
+router.post('/trocas/solicitar', protect, escalaController.solicitarTroca);
+// ===================================================================
 
 // --- ROTAS DE LÍDER ---
 // Rota de criação de escala (turno)
 router.post('/', protect, isLeader, escalaController.createTurno);
-
 // Rota para buscar escalas de um ministério
 router.get('/ministerio/:ministerioId', protect, isLeader, escalaController.getTurnosPorMinisterio);
 
