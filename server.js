@@ -49,6 +49,11 @@ app.use('/api/chatbot', require('./routes/chatbot.routes'));
 app.use('/api/escalas', require('./routes/escala.routes'));
 app.use('/api/disponibilidade', require('./routes/disponibilidade.routes'));
 
+// ===================================================================
+// --- CORREÇÃO: Adiciona a nova rota para o sistema de notificações ---
+app.use('/api/notificacoes', require('./routes/notification.routes'));
+// ===================================================================
+
 // Rota de teste inicial
 app.get('/', (req, res) => {
   res.send('API do App de Escalas está no ar!');
