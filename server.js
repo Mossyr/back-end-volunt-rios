@@ -46,13 +46,15 @@ app.use('/api/auth', require('./routes/auth.routes'));
 app.use('/api/ministerios', require('./routes/ministerio.routes'));
 app.use('/api/lider', require('./routes/lider.routes'));
 app.use('/api/chatbot', require('./routes/chatbot.routes'));
-app.use('/api/escalas', require('./routes/escala.routes'));
-app.use('/api/disponibilidade', require('./routes/disponibilidade.routes'));
 
-// ===================================================================
-// --- CORREÇÃO: Adiciona a nova rota para o sistema de notificações ---
+// ==========================================================
+// LOG DE DIAGNÓSTICO ADICIONADO AQUI
+console.log(`[DIAGNÓSTICO ${new Date().toLocaleTimeString()}] Montando as rotas de /api/escalas...`);
+// ==========================================================
+app.use('/api/escalas', require('./routes/escala.routes'));
+
+app.use('/api/disponibilidade', require('./routes/disponibilidade.routes'));
 app.use('/api/notificacoes', require('./routes/notification.routes'));
-// ===================================================================
 
 // Rota de teste inicial
 app.get('/', (req, res) => {

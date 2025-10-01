@@ -5,6 +5,12 @@ const router = express.Router();
 const escalaController = require('../controllers/escala.controller');
 const { protect, isLeader } = require('../middleware/auth.middleware');
 
+// ==========================================================
+// LOG DE DIAGNÓSTICO ADICIONADO AQUI
+console.log(`[DIAGNÓSTICO ${new Date().toLocaleTimeString()}] Arquivo escala.routes.js foi carregado com sucesso!`);
+// ==========================================================
+
+
 // Rotas específicas do usuário logado
 router.get('/me/proximo', protect, escalaController.getProximoTurno);
 router.get('/me/todas', protect, escalaController.getMinhasEscalas);
@@ -35,7 +41,7 @@ router.post('/trocas/solicitar', protect, escalaController.solicitarTroca);
 // Rota de criação de escala (turno)
 router.post('/', protect, isLeader, escalaController.createTurno);
 // Rota para buscar escalas de um ministério
-router.get('/ministerio/:ministerioId', protect, isLeader, escalaController.getTurnosPorMinisterio);
+router.get('/ministerio/:ministerioId', protect, escalaController.getTurnosPorMinisterio);
 
 
 module.exports = router;
