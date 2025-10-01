@@ -84,14 +84,8 @@ exports.getMinhasEscalas = async (req, res) => {
     }
 };
 
-// ===================================================================
-// --- NOVA FUNÇÃO ADICIONADA ---
-// @desc    Busca todas as escalas futuras dos ministérios que o usuário participa
-// @route   GET /api/escalas/publicas
-// @access  Privado
 exports.getPublicEscalas = async (req, res) => {
     try {
-        // 1. Encontra os ministérios em que o usuário logado está aprovado.
         const usuario = await Usuario.findById(req.user.id).select('ministerios');
         if (!usuario) {
             return res.status(404).json({ msg: 'Usuário não encontrado.' });
@@ -100,19 +94,17 @@ exports.getPublicEscalas = async (req, res) => {
             .filter(m => m.status === 'Aprovado')
             .map(m => m.ministerio);
 
-        // 2. Busca todas as escalas futuras que pertencem a esses ministérios.
         const hoje = new Date();
         hoje.setHours(0, 0, 0, 0);
 
         const escalasPublicas = await Turno.find({
-            'ministerio': { $in: idsDosMeusMinisterios }, // O ministério deve estar na lista do usuário
-            'data': { $gte: hoje }                      // A data deve ser de hoje em diante
+            'ministerio': { $in: idsDosMeusMinisterios },
+            'data': { $gte: hoje }
         })
-        .sort({ data: 1 }) // Ordena por data
-        .populate('ministerio', 'nome') // Traz o nome do ministério
-        .populate('voluntarios', 'nome'); // Traz o nome dos voluntários escalados
+        .sort({ data: 1 })
+        .populate('ministerio', 'nome')
+        .populate('voluntarios', 'nome');
 
-        // 3. Retorna a lista de escalas.
         res.json(escalasPublicas);
 
     } catch (error) {
@@ -120,7 +112,6 @@ exports.getPublicEscalas = async (req, res) => {
         res.status(500).json({ msg: "Erro no servidor." });
     }
 };
-// ===================================================================
 
 exports.getTurnoById = async (req, res) => {
     try {
