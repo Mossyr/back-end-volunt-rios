@@ -84,6 +84,44 @@ exports.getMinhasEscalas = async (req, res) => {
     }
 };
 
+// ===================================================================
+// --- NOVA FUNÇÃO ADICIONADA ---
+// @desc    Busca todas as escalas futuras dos ministérios que o usuário participa
+// @route   GET /api/escalas/publicas
+// @access  Privado
+exports.getPublicEscalas = async (req, res) => {
+    try {
+        // 1. Encontra os ministérios em que o usuário logado está aprovado.
+        const usuario = await Usuario.findById(req.user.id).select('ministerios');
+        if (!usuario) {
+            return res.status(404).json({ msg: 'Usuário não encontrado.' });
+        }
+        const idsDosMeusMinisterios = usuario.ministerios
+            .filter(m => m.status === 'Aprovado')
+            .map(m => m.ministerio);
+
+        // 2. Busca todas as escalas futuras que pertencem a esses ministérios.
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+
+        const escalasPublicas = await Turno.find({
+            'ministerio': { $in: idsDosMeusMinisterios }, // O ministério deve estar na lista do usuário
+            'data': { $gte: hoje }                      // A data deve ser de hoje em diante
+        })
+        .sort({ data: 1 }) // Ordena por data
+        .populate('ministerio', 'nome') // Traz o nome do ministério
+        .populate('voluntarios', 'nome'); // Traz o nome dos voluntários escalados
+
+        // 3. Retorna a lista de escalas.
+        res.json(escalasPublicas);
+
+    } catch (error) {
+        console.error("Erro ao buscar escalas públicas:", error);
+        res.status(500).json({ msg: "Erro no servidor." });
+    }
+};
+// ===================================================================
+
 exports.getTurnoById = async (req, res) => {
     try {
         const turno = await Turno.findById(req.params.turnoId)
@@ -130,13 +168,6 @@ exports.getVoluntariosParaTroca = async (req, res) => {
 };
 
 exports.solicitarTroca = async (req, res) => {
-    // ===================================================================
-    // --- CONSOLE LOG ADICIONADO PARA DEPURAÇÃO ---
-    console.log(`[${new Date().toLocaleTimeString()}] ROTA /trocas/solicitar FOI ATINGIDA!`);
-    console.log("Dados recebidos no body:", req.body);
-    console.log("ID do usuário solicitante:", req.user.id);
-    // ===================================================================
-
     const { turnoId, destinatarioId } = req.body;
     const solicitanteId = req.user.id;
 
