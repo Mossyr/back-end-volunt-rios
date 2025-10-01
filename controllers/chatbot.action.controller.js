@@ -1,11 +1,12 @@
-// controllers/chatbot.action.controller.js
-
 // 1. IMPORTAÇÕES
-const { enviarNotificacaoTelegram } = require('./notificacao.controller');
+// --- ALTERAÇÃO AQUI: Importando do arquivo correto ---
+const { enviarNotificacaoTelegram } = require('./notification.controller');
+// --------------------------------------------------
 const Turno = require('../models/escala.model');
 const Usuario = require('../models/usuario.model');
 const Disponibilidade = require('../models/disponibilidade.model');
 
+// ... (todo o resto do seu arquivo chatbot.action.controller.js continua exatamente igual) ...
 // Função principal que direciona a ação para a função correta
 exports.handleAction = async (req, res) => {
     const { action, turnoId, voluntarioId, data } = req.body;
@@ -29,11 +30,9 @@ exports.handleAction = async (req, res) => {
             case 'SET_UNAVAILABLE':
                 responsePayload = { type: 'message', reply: await setUnavailableFromBot(usuarioLogado, data) };
                 break;
-            // --- INÍCIO DA ALTERAÇÃO: NOVA AÇÃO PARA LÍDERES ---
             case 'CRIAR_ESCALA_INICIAR':
                 responsePayload = await iniciarCriacaoDeEscala(usuarioLogado);
                 break;
-            // --- FIM DA ALTERAÇÃO ---
             default:
                 responsePayload = { type: 'message', reply: 'Desculpe, não entendi essa ação. 🤔' };
         }
@@ -44,31 +43,22 @@ exports.handleAction = async (req, res) => {
     }
 };
 
-// --- INÍCIO DA ALTERAÇÃO: NOVA FUNÇÃO PARA LISTAR MINISTÉRIOS DO LÍDER ---
 async function iniciarCriacaoDeEscala(usuario) {
-    // Filtra apenas os ministérios onde o usuário é um líder aprovado
     const liderancas = usuario.ministerios.filter(m => m.funcao === 'Líder' && m.status === 'Aprovado');
-
     if (liderancas.length === 0) {
         return { type: 'message', reply: "Parece que você não tem permissão de liderança em nenhum ministério para criar escalas." };
     }
-
-    // Mapeia os dados para um formato mais simples para o frontend
     const ministeriosDoLider = liderancas.map(l => ({
         name: l.ministerio.nome,
         id: l.ministerio._id
     }));
-
     return {
         type: 'ministry_list_for_creation',
         reply: 'Certo! Você é líder nos seguintes ministérios. Para qual deles você quer criar uma escala?',
         ministries: ministeriosDoLider
     };
 }
-// --- FIM DA ALTERAÇÃO ---
 
-
-// --- FUNÇÃO DE TROCA ATUALIZADA COM MELHORES VERIFICAÇÕES ---
 async function iniciarTrocaComTelegram(solicitante, turnoId, voluntarioAlvoId) {
     if (!turnoId || !voluntarioAlvoId) {
         return "Parece que faltaram informações para confirmar a troca. Por favor, tente o processo novamente.";
@@ -92,9 +82,6 @@ async function iniciarTrocaComTelegram(solicitante, turnoId, voluntarioAlvoId) {
         return `Puxa! 😟 Tentei notificar o(a) **${voluntarioAlvo.nome}**, mas ele(a) ainda não cadastrou o Telegram no aplicativo. Tente entrar em contato por outro meio.`;
     }
 }
-
-// --- Funções restantes (sem alterações) ---
-
 async function prepararTrocaDeEscala(usuario) {
     const proximoTurno = await Turno.findOne({ voluntarios: usuario.id, data: { $gte: new Date() } })
         .sort({ data: 1 });
@@ -121,7 +108,6 @@ async function prepararTrocaDeEscala(usuario) {
         turnoId: proximoTurno._id
     };
 }
-
 async function setUnavailableFromBot(usuario, dataString) {
     if (!dataString) {
         return 'Por favor, diga a data que quer marcar como indisponível (formato AAAA-MM-DD).';
@@ -141,7 +127,6 @@ async function setUnavailableFromBot(usuario, dataString) {
         return 'Não consegui salvar sua indisponibilidade. Tente novamente.';
     }
 }
-
 async function getProximaEscala(usuario) {
     const proximoTurno = await Turno.findOne({ voluntarios: usuario.id, data: { $gte: new Date() } })
         .sort({ data: 1 })
@@ -152,7 +137,6 @@ async function getProximaEscala(usuario) {
     const dataFormatada = new Date(proximoTurno.data).toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
     return `Sua próxima escala é no ministério de **${proximoTurno.ministerio.nome}**, no dia **${dataFormatada}**, no turno da **${proximoTurno.turno}**.`;
 }
-
 async function getEscalasDoMes(usuario) {
     const hoje = new Date();
     const inicioDoMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
