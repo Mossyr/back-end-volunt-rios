@@ -1,11 +1,8 @@
 const Turno = require('../models/escala.model');
 const Disponibilidade = require('../models/disponibilidade.model');
 const Usuario = require('../models/usuario.model');
-// ===================================================================
-// --- ALTERAÇÃO: Novos modelos importados ---
 const Troca = require('../models/troca.model');
 const Notification = require('../models/notification.model');
-// ===================================================================
 
 exports.createTurno = async (req, res) => {
   const { ministerioId, data, turno, voluntarios } = req.body;
@@ -114,18 +111,15 @@ exports.getVoluntariosParaTroca = async (req, res) => {
         const idsIndisponiveis = indisponibilidades.map(i => i.usuario);
         const idsExcluidos = [req.user.id, ...turno.voluntarios, ...idsIndisponiveis];
 
-        // ===================================================================
-        // --- ALTERAÇÃO: Pequena melhoria na busca para garantir a consulta correta ---
         const voluntariosElegiveis = await Usuario.find({
             '_id': { $nin: idsExcluidos },
             'ministerios': {
-                $elemMatch: { // Garante que o status 'Aprovado' é para o ministério correto
+                $elemMatch: { 
                     ministerio: turno.ministerio,
                     status: 'Aprovado'
                 }
             }
         }).select('nome sobrenome');
-        // ===================================================================
 
         res.json(voluntariosElegiveis);
 
@@ -135,11 +129,14 @@ exports.getVoluntariosParaTroca = async (req, res) => {
     }
 };
 
-// ===================================================================
-// --- NOVA FUNÇÃO ADICIONADA ---
-// @desc    Cria a solicitação de troca e envia a notificação
-// @access  Privado
 exports.solicitarTroca = async (req, res) => {
+    // ===================================================================
+    // --- CONSOLE LOG ADICIONADO PARA DEPURAÇÃO ---
+    console.log(`[${new Date().toLocaleTimeString()}] ROTA /trocas/solicitar FOI ATINGIDA!`);
+    console.log("Dados recebidos no body:", req.body);
+    console.log("ID do usuário solicitante:", req.user.id);
+    // ===================================================================
+
     const { turnoId, destinatarioId } = req.body;
     const solicitanteId = req.user.id;
 
@@ -159,11 +156,11 @@ exports.solicitarTroca = async (req, res) => {
 
         const solicitante = await Usuario.findById(solicitanteId).select('nome');
         await Notification.create({
-            user: destinatarioId, // Para quem é a notificação
+            user: destinatarioId,
             type: 'SWAP_REQUEST',
             fromUser: solicitanteId,
             message: `<strong>${solicitante.nome}</strong> quer trocar a escala do dia <strong>${dataFormatada}</strong> com você.`,
-            relatedId: novaTroca._id // Guarda o ID da troca para futuras ações (aceitar/recusar)
+            relatedId: novaTroca._id
         });
 
         res.status(201).json({ msg: 'Solicitação de troca enviada com sucesso!' });
@@ -173,7 +170,6 @@ exports.solicitarTroca = async (req, res) => {
         res.status(500).json({ msg: 'Erro no servidor ao processar a solicitação.' });
     }
 };
-// ===================================================================
 
 exports.updateTurno = async (req, res) => {
     const { voluntarios } = req.body;
