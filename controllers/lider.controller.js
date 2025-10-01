@@ -2,16 +2,12 @@
 const Usuario = require('../models/usuario.model');
 const Ministerio = require('../models/ministerio.model');
 const Disponibilidade = require('../models/disponibilidade.model');
+const Turno = require('../models/escala.model'); // Adicionado para buscar as escalas
 
-// ===================================================================
-// --- FUNÇÃO CORRIGIDA ---
 // Função para listar voluntários pendentes de um ministério
 exports.getPendingVolunteers = async (req, res) => {
     try {
         const { ministerioId } = req.params;
-
-        // A busca agora usa $elemMatch para garantir que o status 'Pendente'
-        // corresponde EXATAMENTE ao ministério que está sendo consultado.
         const pendingUsers = await Usuario.find({
             'ministerios': {
                 $elemMatch: {
@@ -19,16 +15,13 @@ exports.getPendingVolunteers = async (req, res) => {
                     status: 'Pendente'
                 }
             }
-        }).select('nome sobrenome'); // Retorna apenas nome e sobrenome
-
+        }).select('nome sobrenome');
         res.json(pendingUsers);
-
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Erro no servidor.');
     }
 };
-// ===================================================================
 
 // Função para aprovar um voluntário
 exports.approveVolunteer = async (req, res) => {
@@ -38,7 +31,6 @@ exports.approveVolunteer = async (req, res) => {
         if (!voluntario) {
             return res.status(404).json({ msg: 'Voluntário não encontrado.' });
         }
-        // Correção aqui também: garante que está aprovando um voluntário realmente pendente.
         const ministryIndex = voluntario.ministerios.findIndex(
             m => m.ministerio.toString() === ministerioId && m.status === 'Pendente'
         );
@@ -54,34 +46,62 @@ exports.approveVolunteer = async (req, res) => {
     }
 };
 
-// @desc    Busca todos os voluntários aprovados de um ministério, filtrando por data se informado
-// @route   GET /api/lider/voluntarios/:ministerioId?data=YYYY-MM-DD
-// @access  Líder
+// Função para buscar voluntários aprovados de um ministério
 exports.getApprovedVolunteers = async (req, res) => {
     try {
         const { ministerioId } = req.params;
         const { data } = req.query;
-
         const query = {
-            'ministerios.ministerio': ministerioId,
-            'ministerios.status': 'Aprovado'
+            'ministerios': { $elemMatch: { ministerio: ministerioId, status: 'Aprovado' } }
         };
-
         if (data) {
             const indisponiveis = await Disponibilidade.find({ data: data }).select('usuario');
             const idsIndisponiveis = indisponiveis.map(item => item.usuario);
-
             if (idsIndisponiveis.length > 0) {
                 query._id = { $nin: idsIndisponiveis };
             }
         }
-
         const voluntariosDisponiveis = await Usuario.find(query).select('nome sobrenome');
-
         res.json(voluntariosDisponiveis);
-
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Erro no servidor.');
+    }
+};
+
+// ===================================================================
+// --- NOVA FUNÇÃO ADICIONADA PARA O DASHBOARD DO LÍDER ---
+// ===================================================================
+exports.getDashboardData = async (req, res) => {
+    try {
+        const { ministerioId } = req.params;
+        const user = req.user; // O middleware 'protect' já nos dá o usuário
+
+        // Garante que o usuário logado é líder do ministério que está tentando acessar
+        const isLeaderOfMinistry = user.ministerios.some(
+            m => m.ministerio.equals(ministerioId) && m.funcao === 'Líder' && m.status === 'Aprovado'
+        );
+
+        if (!isLeaderOfMinistry) {
+            return res.status(403).json({ msg: "Acesso não autorizado a este painel de ministério." });
+        }
+
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+
+        // Busca todos os dados necessários para o dashboard em paralelo
+        const [ministerio, proximasEscalas, todosVoluntarios] = await Promise.all([
+            Ministerio.findById(ministerioId).select('nome'),
+            Turno.find({ ministerio: ministerioId, data: { $gte: hoje } }).sort({ data: 1 }).populate('voluntarios', 'nome'),
+            Usuario.find({ 
+                'ministerios': { $elemMatch: { ministerio: ministerioId, status: 'Aprovado' } } 
+            }).select('nome sobrenome')
+        ]);
+
+        res.json({ ministerio, proximasEscalas, todosVoluntarios });
+
+    } catch (error) {
+        console.error("Erro ao buscar dados do dashboard do líder:", error);
+        res.status(500).json({ msg: "Erro no servidor." });
     }
 };
