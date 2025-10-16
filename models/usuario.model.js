@@ -23,6 +23,12 @@ const usuarioSchema = new Schema({
     type: String,
     required: [true, 'A senha é obrigatória.'],
   },
+  // --- CAMPO DE ROLE ADICIONADO ---
+  role: {
+    type: String,
+    enum: ['Usuario', 'Admin'],
+    default: 'Usuario'
+  },
   // --- CAMPO ADICIONADO PARA O TELEGRAM ---
   telegramChatId: {
     type: String,

@@ -60,3 +60,17 @@ exports.isLeader = (req, res, next) => {
         res.status(403).json({ msg: 'Acesso negado. Você não é um líder aprovado para este ministério.' });
     }
 };
+
+/**
+ * @desc Middleware para verificar se o usuário tem a role 'Admin'.
+ */
+exports.isAdmin = (req, res, next) => {
+  // Esta função deve ser usada SEMPRE DEPOIS do 'protect',
+  // pois o 'protect' é quem nos dá o objeto 'req.user'.
+  if (req.user && req.user.role === 'Admin') {
+    next(); // Se o usuário existe E a role é 'Admin', pode prosseguir.
+  } else {
+    // Se não for Admin, retorna um erro de 'Acesso Proibido'.
+    res.status(403).json({ msg: 'Acesso negado. Rota exclusiva para administradores.' });
+  }
+};
