@@ -1,12 +1,18 @@
 // controllers/chatbot.action.controller.js
 const ChatbotService = require('../services/chatbot.service');
+const Usuario = require('../models/usuario.model'); // Importe o modelo de usuário aqui
 
 // Função principal que direciona a ação para a função correta
 exports.handleAction = async (req, res) => {
     const { action, turnoId, voluntarioId, data } = req.body;
-    const usuarioLogado = req.user;
-
+    
     try {
+        // --- INÍCIO DA CORREÇÃO ---
+        // Buscamos o usuário novamente, mas desta vez usamos .populate() para carregar
+        // os detalhes (como o nome) de cada ministério que ele lidera.
+        const usuarioLogado = await Usuario.findById(req.user.id).populate('ministerios.ministerio', 'nome');
+        // --- FIM DA CORREÇÃO ---
+
         let responsePayload;
 
         switch (action) {
