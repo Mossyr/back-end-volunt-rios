@@ -21,37 +21,31 @@ exports.toggleDisponibilidade = async (req, res) => {
             await Disponibilidade.findByIdAndDelete(registroExistente._id);
             res.json({ msg: 'Disponibilidade restaurada.', status: 'disponivel' });
         } else {
-            // --- INÍCIO DA LÓGICA DE VERIFICAÇÃO DE CONFLITO (AGORA CORRIGIDA) ---
-            
-            // Cria um objeto Date para o início do dia (00:00:00)
             const inicioDoDia = new Date(data);
             inicioDoDia.setUTCHours(0, 0, 0, 0);
 
-            // Cria um objeto Date para o fim do dia (23:59:59)
             const fimDoDia = new Date(data);
             fimDoDia.setUTCHours(23, 59, 59, 999);
 
-            // Busca por uma escala para o usuário que esteja DENTRO do intervalo do dia inteiro.
+            // --- CORREÇÃO APLICADA AQUI ---
+            // Trocamos 'usuario: usuarioId' por 'voluntarios: usuarioId'
             const escalaExistente = await Escala.findOne({
-                usuario: usuarioId,
+                voluntarios: usuarioId, // Agora busca o ID do usuário DENTRO do array 'voluntarios'
                 data: {
-                    $gte: inicioDoDia, // $gte = Greater Than or Equal (Maior ou igual a)
-                    $lte: fimDoDia      // $lte = Less Than or Equal (Menor ou igual a)
+                    $gte: inicioDoDia,
+                    $lte: fimDoDia
                 }
             });
-            
-            // --- FIM DA LÓGICA DE VERIFICAÇÃO ---
+            // --- FIM DA CORREÇÃO ---
 
             if (escalaExistente) {
-                // Se encontrou, retorna o conflito como esperado.
-                return res.json({
-                    msg: 'Usuário já está escalado para este dia. Não é possível marcar como indisponível.',
+                return res.status(409).json({ // Usando status 409 (Conflict) para ser mais semântico
+                    msg: 'Você já está escalado para este dia e não pode marcar como indisponível.',
                     status: 'conflito_escala',
                     escalaId: escalaExistente._id
                 });
             }
 
-            // Se não houver conflito, cria o registro de indisponibilidade.
             const novaIndisponibilidade = new Disponibilidade({
                 usuario: usuarioId,
                 data: data,
