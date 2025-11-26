@@ -23,20 +23,17 @@ const usuarioSchema = new Schema({
     type: String,
     required: [true, 'A senha é obrigatória.'],
   },
-  // --- CAMPO DE ROLE ADICIONADO ---
   role: {
     type: String,
     enum: ['Usuario', 'Admin'],
     default: 'Usuario'
   },
-  // --- CAMPO ADICIONADO PARA O TELEGRAM ---
   telegramChatId: {
     type: String,
     trim: true,
-    unique: true, // Garante que um ID do Telegram só pode ser usado por um usuário
-    sparse: true  // Permite valores nulos (nem todos os usuários terão o Telegram conectado)
+    unique: true, 
+    sparse: true  
   },
-  // Estrutura para armazenar os ministérios e as funções do usuário
   ministerios: [{
     ministerio: {
       type: Schema.Types.ObjectId,
@@ -53,11 +50,19 @@ const usuarioSchema = new Schema({
         default: 'Pendente'
     }
   }],
+  // ======================================================
+  // --- CAMPOS ADICIONADOS PARA REDEFINIÇÃO DE SENHA ---
+  resetPasswordToken: {
+    type: String
+  },
+  resetPasswordExpires: {
+    type: Date
+  }
+  // ======================================================
 }, {
-  timestamps: true // Cria automaticamente os campos createdAt e updatedAt
+  timestamps: true 
 });
 
-// Cria o modelo 'Usuario' a partir do schema
 const Usuario = mongoose.model('Usuario', usuarioSchema);
 
 module.exports = Usuario;

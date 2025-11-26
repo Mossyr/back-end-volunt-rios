@@ -87,7 +87,6 @@ exports.login = async (req, res) => {
 };
 
 
-// --- FUNÇÃO ADICIONADA ---
 // @desc    Pega os dados do usuário logado
 // @route   GET /api/auth/me
 // @access  Privado
@@ -97,6 +96,46 @@ exports.getMe = async (req, res) => {
     // Apenas retornamos os dados dele, populando os nomes dos ministérios
     const user = await Usuario.findById(req.user.id).populate('ministerios.ministerio', 'nome');
     res.json(user);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Erro no servidor');
+  }
+};
+
+// ======================================================
+// --- NOVA FUNÇÃO DE RESET DIRETO ADICIONADA ---
+// ======================================================
+
+// @desc    Reseta a senha de um usuário diretamente
+// @route   POST /api/auth/admin-reset
+// @access  Público
+exports.adminResetPassword = async (req, res) => {
+  try {
+    const { celular, novaSenha } = req.body;
+
+    if (!celular || !novaSenha) {
+      return res.status(400).json({ msg: 'Celular e nova senha são obrigatórios.' });
+    }
+
+    if (novaSenha.length < 6) {
+        return res.status(400).json({ msg: 'A nova senha deve ter pelo menos 6 caracteres.' });
+    }
+
+    // 1. Encontra o usuário pelo celular
+    const usuario = await Usuario.findOne({ celular });
+    if (!usuario) {
+      return res.status(404).json({ msg: 'Usuário não encontrado com este celular.' });
+    }
+
+    // 2. Criptografa a nova senha
+    const salt = await bcrypt.genSalt(10);
+    usuario.senha = await bcrypt.hash(novaSenha, salt);
+    
+    // 3. Salva o usuário com a nova senha
+    await usuario.save();
+
+    res.status(200).json({ msg: `Senha do usuário ${usuario.nome} atualizada com sucesso!` });
+
   } catch (error) {
     console.error(error);
     res.status(500).send('Erro no servidor');

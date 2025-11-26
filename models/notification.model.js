@@ -5,13 +5,14 @@ const notificationSchema = new Schema({
     // Para quem é a notificação
     user: { 
         type: Schema.Types.ObjectId, 
-        ref: 'User', // Referência ao seu modelo de Usuário
+        // CORREÇÃO: Mudar 'User' para 'Usuario'
+        ref: 'Usuario', 
         required: true 
     },
     // Tipo da notificação, para o front-end saber como exibi-la
     type: {
         type: String,
-        enum: ['SWAP_REQUEST', 'SWAP_INFO', 'GENERAL'], // Pedido de troca, Informativo de troca, etc.
+        enum: ['SWAP_REQUEST', 'SWAP_INFO', 'GENERAL'], 
         required: true
     },
     // A mensagem que será exibida
@@ -27,14 +28,15 @@ const notificationSchema = new Schema({
     // De quem veio a notificação (opcional, mas útil)
     fromUser: { 
         type: Schema.Types.ObjectId, 
-        ref: 'User' 
+        // CORREÇÃO: Mudar 'User' para 'Usuario'
+        ref: 'Usuario' 
     },
     // ID relacionado à notificação (ex: o ID da solicitação de troca)
     relatedId: {
         type: Schema.Types.ObjectId
     }
 }, {
-    timestamps: true // Cria os campos createdAt e updatedAt automaticamente
+    timestamps: true 
 });
 
 const Notification = mongoose.model('Notification', notificationSchema);

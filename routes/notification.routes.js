@@ -17,4 +17,11 @@ router.get('/', protect, notificationController.getNotifications);
 // @access  Privado
 router.post('/mark-read', protect, notificationController.markNotificationsAsRead);
 
+// ===================================================================
+// --- NOVO: Rota DELETE para excluir notificação ---
+// @route   DELETE /api/notificacoes/:id
+// @access  Privado
+router.delete('/:id', protect, notificationController.deleteNotification);
+// ===================================================================
+
 module.exports = router;

@@ -1,3 +1,5 @@
+// server.js
+
 // Importa as bibliotecas necessárias
 require('dotenv').config();
 const express = require('express');
@@ -19,7 +21,11 @@ async function seedInitialMinisterios() {
       { nome: 'Interna', descricao: 'Responsável pela organização e suporte interno dos cultos.' },
       { nome: 'Iluminação', descricao: 'Operação da mesa de iluminação durante os eventos.' },
       { nome: 'Som', descricao: 'Operação da mesa de som e equipamentos de áudio.' },
-      { nome: 'Recepção', descricao: 'Acolhimento e orientação dos membros e visitantes.' }
+      { nome: 'Recepção', descricao: 'Acolhimento e orientação dos membros e visitantes.' },
+      // --- NOVOS MINISTÉRIOS ADICIONADOS ---
+      { nome: 'Mídias', descricao: 'Responsável pela projeção (telão) e cobertura em redes sociais (stories).' },
+      { nome: 'Comunicação', descricao: 'Responsável pelos avisos, comunicados e oração do ofertório.' }
+      // ------------------------------------
     ];
     for (const min of ministeriosIniciais) {
       const ministerioExistente = await Ministerio.findOne({ nome: min.nome });
@@ -42,12 +48,17 @@ mongoose.connect(MONGO_URI)
   })
   .catch(err => console.error('Erro ao conectar com o MongoDB:', err));
 
+// --- NOVAS ROTAS ADICIONADAS ---
+const trocaRoutes = require('./routes/troca.routes');
+// --- FIM NOVAS ROTAS ---
+
 // Rotas da API
 app.use('/api/auth', require('./routes/auth.routes'));
 app.use('/api/ministerios', require('./routes/ministerio.routes'));
 app.use('/api/lider', require('./routes/lider.routes'));
 app.use('/api/chatbot', require('./routes/chatbot.routes'));
 app.use('/api/escalas', require('./routes/escala.routes'));
+app.use('/api/trocas', trocaRoutes); // <-- ROTA DE TROCAS (IMPORTANTE!)
 app.use('/api/disponibilidade', require('./routes/disponibilidade.routes'));
 app.use('/api/notificacoes', require('./routes/notification.routes'));
 
@@ -63,6 +74,7 @@ app.get('/', (req, res) => {
 const PORT = process.env.PORT || 5000;
 
 // --- INÍCIO DO CÓDIGO DE AUTO-PING ---
+// Mantido o código original de auto-ping para manter a consistência
 const PING_URL = "https://back-end-volunt-rios.onrender.com";
 const PING_INTERVAL_MINUTES = 10;
 
@@ -82,5 +94,6 @@ const selfPing = () => {
 // Inicia o servidor
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
+  // Inicia o auto-ping
   setInterval(selfPing, PING_INTERVAL_MINUTES * 60 * 1000);
 });

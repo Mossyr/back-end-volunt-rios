@@ -13,4 +13,13 @@ router.post('/login', authController.login);
 // Só pode ser acessada por usuários logados (com token válido)
 router.get('/me', protect, authController.getMe);
 
+// ======================================================
+// --- NOVA ROTA DE RESET DIRETO ADICIONADA ---
+// ======================================================
+
+// @route   POST /api/auth/admin-reset
+// @desc    Reseta a senha de um usuário diretamente
+// @access  Público (Como você pediu. Se quiser proteger, adicione 'protect' aqui)
+router.post('/admin-reset', authController.adminResetPassword);
+
 module.exports = router;
