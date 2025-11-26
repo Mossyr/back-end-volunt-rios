@@ -1,13 +1,16 @@
-// routes/disponibilidade.routes.js
 const express = require('express');
 const router = express.Router();
+// Garanta que o caminho aqui aponta para o arquivo acima
+const controller = require('../controllers/disponibilidade.controller');
 const { protect } = require('../middleware/auth.middleware');
-const disponibilidadeController = require('../controllers/disponibilidade.controller');
 
-// Rota para buscar as indisponibilidades do usuário logado
-router.get('/me', protect, disponibilidadeController.getMinhasDisponibilidades);
+// Rota para buscar (GET)
+router.get('/me', protect, controller.getMyDisponibilidade);
 
-// Rota para adicionar ou remover uma indisponibilidade
-router.post('/toggle', protect, disponibilidadeController.toggleDisponibilidade);
+// Rota para salvar/atualizar (POST)
+router.post('/save', protect, controller.saveDisponibilidade);
+
+// Rota para deletar (DELETE)
+router.delete('/delete', protect, controller.deleteDisponibilidade);
 
 module.exports = router;

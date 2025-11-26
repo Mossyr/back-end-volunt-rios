@@ -1,8 +1,9 @@
 // controllers/lider.controller.js
+const mongoose = require('mongoose'); // <--- IMPORTANTE: Adicionei isso
 const Usuario = require('../models/usuario.model');
 const Ministerio = require('../models/ministerio.model');
 const Disponibilidade = require('../models/disponibilidade.model');
-const Turno = require('../models/escala.model'); // Adicionado para buscar as escalas
+const Turno = require('../models/escala.model'); 
 
 // Função para listar voluntários pendentes de um ministério
 exports.getPendingVolunteers = async (req, res) => {
@@ -46,62 +47,118 @@ exports.approveVolunteer = async (req, res) => {
     }
 };
 
-// Função para buscar voluntários aprovados de um ministério
+// ===================================================================
+// --- FUNÇÃO BLINDADA V2: AGORA COM VALIDAÇÃO DE OBJECTID ---
+// ===================================================================
 exports.getApprovedVolunteers = async (req, res) => {
     try {
         const { ministerioId } = req.params;
-        const { data } = req.query;
+        const { data } = req.query; // Data vem como string 'YYYY-MM-DD'
+        
+        // Query base: Usuários aprovados neste ministério
         const query = {
             'ministerios': { $elemMatch: { ministerio: ministerioId, status: 'Aprovado' } }
         };
+
+        let idsBloqueados = [];
+
         if (data) {
-            const indisponiveis = await Disponibilidade.find({ data: data }).select('usuario');
-            const idsIndisponiveis = indisponiveis.map(item => item.usuario);
-            if (idsIndisponiveis.length > 0) {
-                query._id = { $nin: idsIndisponiveis };
+            // Validação de Data
+            const dateObj = new Date(data);
+            if (isNaN(dateObj.getTime())) {
+                return res.status(400).json({ msg: "Data inválida." });
             }
+
+            // 1. INDISPONIBILIDADE MANUAL
+            const indisponiveis = await Disponibilidade.find({ data: data }).select('usuario');
+            const idsIndisponiveisManual = indisponiveis.map(item => item.usuario.toString());
+            idsBloqueados = [...idsBloqueados, ...idsIndisponiveisManual];
+
+            // 2. CONFLITO DE AGENDA (JÁ ESCALADO)
+            const startOfDay = new Date(data);
+            startOfDay.setUTCHours(0, 0, 0, 0);
+            
+            const endOfDay = new Date(data);
+            endOfDay.setUTCHours(23, 59, 59, 999);
+
+            const escalasDoDia = await Turno.find({
+                data: { $gte: startOfDay, $lte: endOfDay }
+            }).select('voluntarios');
+
+            // Extração ULTRA SEGURA de IDs
+            escalasDoDia.forEach(escala => {
+                if (escala.voluntarios && Array.isArray(escala.voluntarios)) {
+                    escala.voluntarios.forEach(v => {
+                        try {
+                            // Caso 1: Novo Schema (v é objeto com propriedade .usuario)
+                            if (v && v.usuario && mongoose.Types.ObjectId.isValid(v.usuario)) {
+                                idsBloqueados.push(v.usuario.toString());
+                            } 
+                            // Caso 2: Velho Schema (v é o próprio ID)
+                            else if (v && mongoose.Types.ObjectId.isValid(v)) {
+                                idsBloqueados.push(v.toString());
+                            }
+                            // Caso 3: Lixo (ex: objeto sem usuario) -> IGNORA SILENCIOSAMENTE
+                        } catch (e) {
+                            // Ignora erros de parse individual
+                        }
+                    });
+                }
+            });
+
+            // Remove duplicatas
+            idsBloqueados = [...new Set(idsBloqueados)];
         }
+
+        // Se houver bloqueados, aplica o filtro
+        if (idsBloqueados.length > 0) {
+            query._id = { $nin: idsBloqueados };
+        }
+
         const voluntariosDisponiveis = await Usuario.find(query).select('nome sobrenome');
         res.json(voluntariosDisponiveis);
+
     } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Erro no servidor.');
+        console.error("Erro CRÍTICO ao buscar voluntários:", err);
+        res.status(500).json({ msg: 'Erro no servidor ao buscar voluntários.' });
     }
 };
 
-// ===================================================================
-// --- NOVA FUNÇÃO ADICIONADA PARA O DASHBOARD DO LÍDER ---
-// ===================================================================
+// Função para o Dashboard
 exports.getDashboardData = async (req, res) => {
     try {
         const { ministerioId } = req.params;
-        const user = req.user; // O middleware 'protect' já nos dá o usuário
+        const user = req.user;
 
-        // Garante que o usuário logado é líder do ministério que está tentando acessar
+        if (!ministerioId || !mongoose.Types.ObjectId.isValid(ministerioId)) {
+             return res.status(400).json({ msg: "ID do ministério inválido." });
+        }
+
         const isLeaderOfMinistry = user.ministerios.some(
             m => m.ministerio.equals(ministerioId) && m.funcao === 'Líder' && m.status === 'Aprovado'
         );
 
         if (!isLeaderOfMinistry) {
-            return res.status(403).json({ msg: "Acesso não autorizado a este painel de ministério." });
+            return res.status(403).json({ msg: "Acesso não autorizado." });
         }
 
         const hoje = new Date();
         hoje.setHours(0, 0, 0, 0);
 
-        // Busca todos os dados necessários para o dashboard em paralelo
         const [ministerio, proximasEscalas, todosVoluntarios] = await Promise.all([
             Ministerio.findById(ministerioId).select('nome'),
-            Turno.find({ ministerio: ministerioId, data: { $gte: hoje } }).sort({ data: 1 }).populate('voluntarios', 'nome'),
+            Turno.find({ ministerio: ministerioId, data: { $gte: hoje } }).sort({ data: 1 }).populate('voluntarios.usuario', 'nome'),
             Usuario.find({ 
                 'ministerios': { $elemMatch: { ministerio: ministerioId, status: 'Aprovado' } } 
             }).select('nome sobrenome')
         ]);
 
+        if (!ministerio) return res.status(404).json({ msg: "Ministério não encontrado." });
+
         res.json({ ministerio, proximasEscalas, todosVoluntarios });
 
     } catch (error) {
-        console.error("Erro ao buscar dados do dashboard do líder:", error);
+        console.error("Erro ao buscar dados do dashboard:", error);
         res.status(500).json({ msg: "Erro no servidor." });
     }
 };

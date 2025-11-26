@@ -11,16 +11,19 @@ const turnoSchema = new Schema({
     type: Date,
     required: true,
   },
-  // CAMPOS DE HORA REMOVIDOS E CAMPO DE TURNO ADICIONADO
   turno: {
     type: String,
     enum: ['Manhã', 'Noite'],
     required: true,
   },
+  // --- MUDANÇA AQUI ---
+  // Antes era só uma lista de IDs. Agora é uma lista de objetos com ID e ROLE.
   voluntarios: [{
-    type: Schema.Types.ObjectId,
-    ref: 'Usuario',
+    _id: false, // Evita criar um ID extra inútil para o sub-documento
+    usuario: { type: Schema.Types.ObjectId, ref: 'Usuario' },
+    role: { type: String, default: 'Voluntário' } 
   }],
+  // --------------------
   criado_por: {
     type: Schema.Types.ObjectId,
     ref: 'Usuario',
@@ -30,6 +33,6 @@ const turnoSchema = new Schema({
   timestamps: true
 });
 
-const Turno = mongoose.model('Turno', turnoSchema);
+const Turno = mongoose.model('Turno', turnoSchema, 'escalas');
 
 module.exports = Turno;
